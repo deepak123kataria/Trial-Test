@@ -176,11 +176,27 @@ export default function ChatRoom() {
     e.preventDefault();
     setIsDragging(false);
     const file = e.dataTransfer.files[0];
-    if (file && file.type.startsWith('image/')) {
+    if (file) {
+      if (file.size > 50 * 1024 * 1024) {
+        alert('File size exceeds the 50MB limit.');
+        return;
+      }
+      
       const reader = new FileReader();
-      reader.onload = (ev) => {
-        socket.emit('message:send', { type: 'image', imageData: ev.target.result });
-      };
+      if (file.type.startsWith('image/')) {
+        reader.onload = (ev) => {
+          socket.emit('message:send', { type: 'image', imageData: ev.target.result });
+        };
+      } else {
+        reader.onload = (ev) => {
+          socket.emit('message:send', { 
+            type: 'file', 
+            fileData: ev.target.result, 
+            fileName: file.name, 
+            fileSize: file.size 
+          });
+        };
+      }
       reader.readAsDataURL(file);
     }
   }, []);

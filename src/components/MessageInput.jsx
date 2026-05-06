@@ -4,13 +4,14 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import EmojiPicker from './EmojiPicker';
 import StickerPicker from './StickerPicker';
-import { IconSend, IconSmile, IconImage, IconClock } from '../utils/icons';
+import { IconSend, IconSmile, IconImage, IconClock, IconPaperclip } from '../utils/icons';
 
 export default function MessageInput({ onSend, onTypingStart, onTypingStop, typingUsers, currentUsername }) {
   const [text, setText] = useState('');
   const [showEmoji, setShowEmoji] = useState(false);
   const [showSticker, setShowSticker] = useState(false);
   const [imagePreview, setImagePreview] = useState(null);
+  const [filePreview, setFilePreview] = useState(null);
   const [selfDestruct, setSelfDestruct] = useState(0);
   const textRef = useRef(null);
   const typingTimeoutRef = useRef(null);
@@ -25,11 +26,21 @@ export default function MessageInput({ onSend, onTypingStart, onTypingStop, typi
 
   // Send message
   const handleSend = useCallback(() => {
-    if (!text.trim() && !imagePreview) return;
+    if (!text.trim() && !imagePreview && !filePreview) return;
 
     if (imagePreview) {
-      onSend({ type: 'image', imageData: imagePreview, selfDestruct: selfDestruct || null });
+      onSend({ type: 'image', imageData: imagePreview, text: text.trim(), selfDestruct: selfDestruct || null });
       setImagePreview(null);
+    } else if (filePreview) {
+      onSend({ 
+        type: 'file', 
+        fileData: filePreview.data, 
+        fileName: filePreview.name, 
+        fileSize: filePreview.size, 
+        text: text.trim(),
+        selfDestruct: selfDestruct || null 
+      });
+      setFilePreview(null);
     } else {
       onSend({ type: 'text', text: text.trim(), selfDestruct: selfDestruct || null });
     }
@@ -40,7 +51,7 @@ export default function MessageInput({ onSend, onTypingStart, onTypingStop, typi
     setShowEmoji(false);
     setShowSticker(false);
     textRef.current?.focus();
-  }, [text, imagePreview, selfDestruct, onSend, onTypingStop]);
+  }, [text, imagePreview, filePreview, selfDestruct, onSend, onTypingStop]);
 
   // Enter key to send
   const handleKeyDown = (e) => {
@@ -54,8 +65,25 @@ export default function MessageInput({ onSend, onTypingStart, onTypingStop, typi
   const handleImageSelect = (e) => {
     const file = e.target.files[0];
     if (file && file.type.startsWith('image/')) {
+      if (file.size > 50 * 1024 * 1024) return alert('File size exceeds 50MB');
       const reader = new FileReader();
-      reader.onload = (ev) => setImagePreview(ev.target.result);
+      reader.onload = (ev) => {
+        setImagePreview(ev.target.result);
+        setFilePreview(null);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (file && !file.type.startsWith('image/')) {
+      if (file.size > 50 * 1024 * 1024) return alert('File size exceeds 50MB');
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setFilePreview({ name: file.name, size: file.size, data: ev.target.result });
+        setImagePreview(null);
+      };
       reader.readAsDataURL(file);
     }
   };
@@ -106,6 +134,16 @@ export default function MessageInput({ onSend, onTypingStart, onTypingStop, typi
         </div>
       )}
 
+      {/* File preview */}
+      {filePreview && (
+        <div className="image-preview" style={{ padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+          <IconPaperclip size={24} style={{ color: 'var(--primary)' }} />
+          <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>{filePreview.name}</span>
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>File ready ({(filePreview.size / 1024 / 1024).toFixed(2)} MB)</span>
+          <button className="image-preview-remove" onClick={() => setFilePreview(null)}>✕</button>
+        </div>
+      )}
+
       {/* Self-destruct toggle */}
       {selfDestruct > 0 && (
         <div className="destruct-toggle">
@@ -132,7 +170,7 @@ export default function MessageInput({ onSend, onTypingStart, onTypingStop, typi
             id="chat-input"
             ref={textRef}
             className="chat-text-input"
-            placeholder={imagePreview ? 'Add a caption (optional)' : 'Type a message...'}
+            placeholder={imagePreview || filePreview ? 'Add a caption (optional)' : 'Type a message...'}
             value={text}
             onChange={handleTextChange}
             onKeyDown={handleKeyDown}
@@ -149,6 +187,10 @@ export default function MessageInput({ onSend, onTypingStart, onTypingStop, typi
             <label className="input-action-btn" title="Image">
               <IconImage size={18} />
               <input type="file" accept="image/*" onChange={handleImageSelect} style={{ display: 'none' }} />
+            </label>
+            <label className="input-action-btn" title="Attach File">
+              <IconPaperclip size={18} />
+              <input type="file" onChange={handleFileSelect} style={{ display: 'none' }} />
             </label>
             <button
               className="input-action-btn"
@@ -183,7 +225,7 @@ export default function MessageInput({ onSend, onTypingStart, onTypingStop, typi
           )}
         </div>
 
-        <button className="send-btn" onClick={handleSend} disabled={!text.trim() && !imagePreview} title="Send message">
+        <button className="send-btn" onClick={handleSend} disabled={!text.trim() && !imagePreview && !filePreview} title="Send message">
           <IconSend size={18} />
         </button>
       </div>
