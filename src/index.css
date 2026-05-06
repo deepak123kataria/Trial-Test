@@ -701,12 +701,68 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .typing-dot:nth-child(2) { animation-delay: 0.2s; }
 .typing-dot:nth-child(3) { animation-delay: 0.4s; }
 
+/* ─── Sending Indicator ─── */
+.sending-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.4rem;
+  background: var(--bg-tertiary);
+  border: 1px solid rgba(168, 85, 247, 0.2);
+  border-radius: var(--radius-sm);
+  animation: fadeIn 0.2s ease-out;
+  overflow: hidden;
+  position: relative;
+}
+
+.sending-indicator-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 100%;
+  background: linear-gradient(90deg, transparent, rgba(168, 85, 247, 0.12), transparent);
+  animation: sendingSlide 1.2s ease-in-out infinite;
+}
+
+@keyframes sendingSlide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.sending-indicator-text {
+  position: relative;
+  z-index: 1;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* ─── Send spinner ─── */
+.send-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 .input-row { display: flex; align-items: flex-end; gap: 0.5rem; }
-.input-wrapper { flex: 1; position: relative; }
+.input-wrapper { flex: 1; position: relative; display: flex; flex-direction: column; }
 
 .chat-text-input {
   width: 100%;
-  padding: 0.65rem 5.5rem 0.65rem 1rem;
+  padding: 0.65rem 1rem;
+  padding-right: 5.5rem;
   background: var(--bg-input);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -717,6 +773,8 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   max-height: 120px;
   transition: border-color var(--transition), box-shadow var(--transition);
   line-height: 1.4;
+  -webkit-appearance: none;
+  font-size: 16px; /* Prevents iOS zoom on focus */
 }
 
 .chat-text-input:focus {
@@ -726,7 +784,13 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 
 .chat-text-input::placeholder { color: var(--text-muted); }
 
-.input-actions { display: flex; gap: 0.1rem; position: absolute; right: 8px; bottom: 6px; }
+.input-actions {
+  display: flex;
+  gap: 0.1rem;
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+}
 
 .input-action-btn {
   width: 28px;
@@ -741,9 +805,11 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   border-radius: 6px;
   transition: all var(--transition);
   font-size: 1.05rem;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .input-action-btn:hover { color: var(--accent); background: var(--accent-subtle); }
+.input-action-btn:active { color: var(--accent); background: var(--accent-subtle); }
 
 .send-btn {
   width: 42px;
@@ -759,6 +825,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   transition: all var(--transition);
   flex-shrink: 0;
   box-shadow: 0 2px 12px var(--accent-glow);
+  -webkit-tap-highlight-color: transparent;
 }
 
 .send-btn:hover { transform: scale(1.05); box-shadow: 0 4px 20px rgba(168, 85, 247, 0.4); }
@@ -1173,6 +1240,66 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   .form-row { grid-template-columns: 1fr; }
   .orb { opacity: 0.1; }
   .feature-chip { font-size: 0.75rem; padding: 0.4rem 0.7rem; }
+
+  /* ── Mobile Input Layout ── */
+  /* Move action buttons BELOW the textarea instead of inside it */
+  .chat-text-input {
+    padding-right: 1rem !important; /* Remove right padding for icons */
+  }
+
+  .input-actions {
+    position: static;
+    display: flex;
+    gap: 0.25rem;
+    padding: 0.35rem 0 0;
+    justify-content: flex-start;
+  }
+
+  .input-action-btn {
+    width: 34px;
+    height: 34px;
+    font-size: 1.1rem;
+    border-radius: 8px;
+    background: var(--bg-glass);
+    border: 1px solid var(--border);
+  }
+
+  .input-action-btn:active {
+    background: var(--accent-subtle);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* Picker overlay on mobile */
+  .picker-overlay {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    margin-bottom: 0;
+    z-index: 200;
+  }
+
+  .emoji-grid {
+    width: 100%;
+    grid-template-columns: repeat(8, 1fr);
+    max-height: 200px;
+  }
+
+  .sticker-grid {
+    width: 100%;
+    max-height: 200px;
+  }
+
+  .picker-panel {
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    max-height: 50vh;
+  }
+
+  /* Chat input area bottom padding for safe area (notched phones) */
+  .chat-input-area {
+    padding-bottom: calc(0.7rem + env(safe-area-inset-bottom, 0px));
+  }
 }
 
 @media (max-width: 480px) {
@@ -1183,4 +1310,17 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   .chat-header-right { gap: 0.2rem; }
   .countdown-timer { font-size: 0.68rem; padding: 0.2rem 0.4rem; }
   .landing-features { gap: 0.6rem; }
+
+  .chat-input-area { padding: 0.4rem 0.6rem; padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px)); }
+  .input-row { gap: 0.35rem; }
+  .send-btn { width: 38px; height: 38px; }
+  .chat-text-input { min-height: 38px; font-size: 16px; padding: 0.55rem 0.85rem !important; }
+
+  .input-action-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 1rem;
+  }
+
+  .message-image { max-width: 220px; max-height: 220px; }
 }
