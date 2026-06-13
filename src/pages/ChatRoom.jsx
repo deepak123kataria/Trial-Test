@@ -24,6 +24,7 @@ export default function ChatRoom() {
   const { roomId } = useParams();
   const navigate = useNavigate();
   const messagesEndRef = useRef(null);
+  const initRef = useRef(false); // Guard against double initialization
 
   // ─── State ────────────────────────────────────
   const [username, setUsername] = useState('');
@@ -51,61 +52,44 @@ export default function ChatRoom() {
 
   // ─── Initialize from sessionStorage (runs once) ───────
   useEffect(() => {
+    if (initRef.current) return;
+    initRef.current = true;
+
     const stored = sessionStorage.getItem('vanish-room-data');
-    if (!stored) {
+    if (stored) {
+      const data = JSON.parse(stored);
+      setUsername(data.username);
+      usernameRef.current = data.username;
+      setIsHost(data.isHost || false);
+      setEndTime(data.endTime || null);
+      setMessages(data.messages || []);
+      setPolls(data.polls || []);
+      setTheme(data.theme || 'dark');
+      applyTheme(data.theme || 'dark', data.customColors);
+      sessionStorage.removeItem('vanish-room-data');
+      setReady(true);
+
+      // Fetch latest state from server (members arrived before we mounted)
+      setTimeout(() => {
+        socket.emit('room:getState', {}, (res) => {
+          if (res.success) {
+            setMembers(res.members);
+            // Merge any messages we missed
+            setMessages(prev => {
+              const existingIds = new Set(prev.map(m => m.id));
+              const newMsgs = (res.messages || []).filter(m => !existingIds.has(m.id));
+              return newMsgs.length > 0 ? [...prev, ...newMsgs] : prev;
+            });
+            setPolls(res.polls || []);
+          }
+        });
+      }, 100);
+    } else {
       // No session data = arrived via direct URL without joining
       navigate('/');
-      return;
     }
-
-    const data = JSON.parse(stored);
-    setUsername(data.username);
-    usernameRef.current = data.username;
-    setIsHost(data.isHost || false);
-    setEndTime(data.endTime || null);
-    setMessages(data.messages || []);
-    setPolls(data.polls || []);
-    setTheme(data.theme || 'dark');
-    applyTheme(data.theme || 'dark', data.customColors);
-    setReady(true);
-
-    // Fetch latest state from server (members arrived before we mounted)
-    const stateTimer = setTimeout(() => {
-      socket.emit('room:getState', {}, (res) => {
-        if (res && res.success) {
-          setMembers(res.members);
-          // Merge any messages we missed
-          setMessages(prev => {
-            const existingIds = new Set(prev.map(m => m.id));
-            const newMsgs = (res.messages || []).filter(m => !existingIds.has(m.id));
-            return newMsgs.length > 0 ? [...prev, ...newMsgs] : prev;
-          });
-          setPolls(res.polls || []);
-        }
-      });
-    }, 100);
-
-    // Cleanup: clear sessionStorage only after successful init,
-    // and clean up the timer if component unmounts early (StrictMode)
-    return () => {
-      clearTimeout(stateTimer);
-      // Only remove session data on final unmount when ready was set
-      // StrictMode will re-run the effect, so data stays in sessionStorage
-      // until the component is truly done initializing
-    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Runs on mount
-
-  // Clean up sessionStorage after stable mount (deferred to survive StrictMode)
-  useEffect(() => {
-    if (ready) {
-      // Use a small delay so StrictMode double-mount doesn't clear it prematurely
-      const cleanup = setTimeout(() => {
-        sessionStorage.removeItem('vanish-room-data');
-      }, 500);
-      return () => clearTimeout(cleanup);
-    }
-  }, [ready]);
+  }, []); // Empty deps + guard ref = runs exactly once
 
   // ─── Socket listeners (stable — never re-register) ───────
   useEffect(() => {
@@ -192,27 +176,11 @@ export default function ChatRoom() {
     e.preventDefault();
     setIsDragging(false);
     const file = e.dataTransfer.files[0];
-    if (file) {
-      if (file.size > 50 * 1024 * 1024) {
-        alert('File size exceeds the 50MB limit.');
-        return;
-      }
-      
+    if (file && file.type.startsWith('image/')) {
       const reader = new FileReader();
-      if (file.type.startsWith('image/')) {
-        reader.onload = (ev) => {
-          socket.emit('message:send', { type: 'image', imageData: ev.target.result });
-        };
-      } else {
-        reader.onload = (ev) => {
-          socket.emit('message:send', { 
-            type: 'file', 
-            fileData: ev.target.result, 
-            fileName: file.name, 
-            fileSize: file.size 
-          });
-        };
-      }
+      reader.onload = (ev) => {
+        socket.emit('message:send', { type: 'image', imageData: ev.target.result });
+      };
       reader.readAsDataURL(file);
     }
   }, []);
